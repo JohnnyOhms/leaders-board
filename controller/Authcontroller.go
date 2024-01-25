@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/JohnnyOhms/projectx/entity"
@@ -19,7 +21,10 @@ import (
 type AuthController interface {
 	LoginUser(ctx *gin.Context)
 	SignUpUser(ctx *gin.Context)
+	SetUserDetails(ctx *gin.Context)
+	ReteriveUserDetails(ctx *gin.Context)
 	DiscordAuth(ctx *gin.Context)
+	UploadHandler(ctx *gin.Context)
 }
 
 // controller is the implementation of AuthController.
@@ -61,6 +66,7 @@ func (c *controller) LoginUser(ctx *gin.Context) {
 		})
 		return
 	}
+	// generate token for authorization
 	token, err := c.services.GenearateToken(user)
 	if err != nil {
 		ctx.JSON(500, gin.H{
@@ -105,9 +111,64 @@ func (c *controller) SignUpUser(ctx *gin.Context) {
 		})
 		return
 	}
+	// generate token for authorization
+	token, err := c.services.GenearateToken(user)
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"error": "Failed to Generate Token",
+		})
+		return
+	}
+	// set cookie
+	ctx.SetSameSite(http.SameSiteLaxMode)
+	ctx.SetCookie("Authorization", token, 3600*24*10, "", "", false, true)
 
 	// Handle successful user creation
 	ctx.JSON(http.StatusCreated, user)
+}
+
+// set the user details
+func (c *controller) SetUserDetails(ctx *gin.Context) {
+	// Get the req body from the user
+	var UserBody entity.User_Details
+	// Parse the req body
+	if err := ctx.Bind(&UserBody); err != nil {
+		ctx.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+	// create user details
+	userDetails, err := c.services.CreateDetails(UserBody)
+	if err != nil {
+		ctx.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+	ctx.JSON(http.StatusCreated, userDetails)
+}
+
+// retrieve the user details
+func (c *controller) ReteriveUserDetails(ctx *gin.Context) {
+	// Get the req body from the user
+	var userId entity.UserId
+	// Parse the req body
+	if err := ctx.Bind(&userId); err != nil {
+		ctx.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+	//find user details
+	userDetails, err := c.services.FindDetails(userId)
+	if err != nil {
+		ctx.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+	ctx.JSON(http.StatusCreated, userDetails)
 }
 
 // discord auth api
@@ -202,7 +263,7 @@ func (c *controller) DiscordAuth(ctx *gin.Context) {
 	}
 
 	//Parse the User Response body
-	var UserInfo entity.UserData
+	var UserInfo entity.UserDiscordData
 	err = json.Unmarshal(userResponseBody, &UserInfo)
 	if err != nil {
 		fmt.Println("Error decoding token JSON:", err)
@@ -216,57 +277,113 @@ func (c *controller) DiscordAuth(ctx *gin.Context) {
 		Password: UserInfo.ID,
 	}
 
-	user, err := c.services.Find(FindUserInfo)
-	if err != nil {
-		ctx.JSON(400, gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
-	// "record not found"
-	// work on here
-
-	if user.Email != "" {
-		// compare password
-		err = c.services.ComparePassword([]byte(user.Password), []byte(FindUserInfo.Password))
-		if err != nil {
-			ctx.JSON(400, gin.H{
-				"error": "Password incorrect in the discord route",
-			})
-			return
-		}
-		// Generate Token and Set Cookie
-		token, err := c.services.GenearateToken(user)
-		if err != nil {
-			ctx.JSON(500, gin.H{
-				"error": "Failed to Generate Token",
-			})
-			return
-		}
-		// set cookie
-		ctx.SetSameSite(http.SameSiteLaxMode)
-		ctx.SetCookie("Authorization", token, 3600*24*10, "", "", false, true)
-		// Handle successful user retriever
-		ctx.JSON(202, user)
-		return
-	}
-
 	// Create the user From DB
 	var CreateUserInfo entity.User = entity.User{
-		Username: UserInfo.Username,
 		Email:    UserInfo.Email,
 		Password: UserInfo.ID,
 		UserId:   c.services.GenerateUserId(),
 	}
-	user, err = c.services.Create(CreateUserInfo)
+
+	user, err := c.services.Find(FindUserInfo)
 	if err != nil {
+		if err.Error() == "record not found" {
+
+			// Hash the password
+			hash, err := c.services.HashPassword([]byte(CreateUserInfo.Password))
+			if err != nil {
+				ctx.JSON(400, gin.H{
+					"error": "failed in Hashing password",
+				})
+				return
+			}
+			CreateUserInfo.Password = string(hash)
+			user, err = c.services.Create(CreateUserInfo)
+			if err != nil {
+				ctx.JSON(400, gin.H{
+					"error": err.Error(),
+				})
+				return
+			}
+			// generate token for authorization
+			token, err := c.services.GenearateToken(user)
+			if err != nil {
+				ctx.JSON(500, gin.H{
+					"error": "Failed to Generate Token",
+				})
+				return
+			}
+			// set cookie
+			ctx.SetSameSite(http.SameSiteLaxMode)
+			ctx.SetCookie("Authorization", token, 3600*24*10, "", "", false, true)
+			ctx.JSON(202, user)
+			return
+		} else {
+
+			ctx.JSON(400, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+	}
+	// compare password
+	err = c.services.ComparePassword([]byte(user.Password), []byte(FindUserInfo.Password))
+	if err != nil {
+
+		fmt.Println("Error:", err)
 		ctx.JSON(400, gin.H{
-			"error": err.Error(),
+			"error": "Password incorrect in the discord route",
 		})
 		return
 	}
 
-	// Send the response body as part of the JSON response
-	// ctx.JSON(http.StatusOK, gin.H{"message": "ok", "user_data": string(userResponseBody)})
-	ctx.JSON(201, user)
+	// Generate Token and Set Cookie
+	token, err := c.services.GenearateToken(user)
+	if err != nil {
+		ctx.JSON(500, gin.H{
+			"error": "Failed to Generate Token",
+		})
+		return
+	}
+	user.Password = "NULL"
+	// set cookie
+	ctx.SetSameSite(http.SameSiteLaxMode)
+	ctx.SetCookie("Authorization", token, 3600*24*10, "", "", false, true)
+	ctx.JSON(202, user)
+}
+
+// upload the avatar (profile pic) to the server
+func (c *controller) UploadHandler(ctx *gin.Context) {
+	// Parse the form data, including the uploaded file
+	err := ctx.Request.ParseMultipartForm(1 << 20) // 1 MB limit for the uploaded file
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": "Unable to parse form"})
+		return
+	}
+
+	// Get the file from the request
+	file, handler, err := ctx.Request.FormFile("avatar")
+	if err != nil {
+		ctx.JSON(400, gin.H{"error": "Error retrieving the file"})
+		return
+	}
+	defer file.Close()
+
+	// Create a new file on the server to save the uploaded file
+	filename := filepath.Join("uploads", handler.Filename)
+	f, err := os.Create(filename)
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": "Unable to create the file on the server"})
+		return
+	}
+	defer f.Close()
+
+	// Copy the file content to the new file
+	_, err = io.Copy(f, file)
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": "Unable to copy the file content"})
+		return
+	}
+
+	// Respond with a success message
+	ctx.JSON(201, gin.H{"message": fmt.Sprintf("File %s uploaded successfully", handler.Filename)})
 }

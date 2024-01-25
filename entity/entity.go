@@ -1,15 +1,30 @@
 package entity
 
 type User struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password" binding:"required,min=5"`
-	UserId   string `json:"user_id"`
+	Email        string `json:"email"`
+	Password     string `json:"password" binding:"required,min=5"`
+	UserId       string `json:"user_id"`
+	Is_Verified  bool   `json:"is_verified"`
+	Account_Type string `json:"account_type"`
 }
 
 type LoginUser struct {
 	Email    string `json:"email"`
 	Password string `json:"password" binding:"required,min=5"`
+}
+
+type UserId struct {
+	userId string
+}
+
+type User_Details struct {
+	UserId   string `json:"user_id"`
+	Avatar   string `json:"avatar"`
+	Username string `json:"username"`
+	Phone    int    `json:"phone"`
+	Twitter  string `json:"twitter"`
+	Discord  string `json:"discord"`
+	Google   string `json:"google"`
 }
 
 type DiscordToken struct {
@@ -20,7 +35,7 @@ type DiscordToken struct {
 	Scope        string `json:"scope"`
 }
 
-type UserData struct {
+type UserDiscordData struct {
 	ID                   string `json:"id"`
 	Username             string `json:"username"`
 	Avatar               string `json:"avatar"`

@@ -19,6 +19,8 @@ type AuthService interface {
 	ComparePassword(userPwd []byte, pwd []byte) error
 	GenearateToken(user entity.User) (string, error)
 	GenerateUserId() string
+	CreateDetails(details entity.User_Details) (entity.User_Details, error)
+	FindDetails(userId entity.UserId) (entity.User_Details, error)
 }
 
 // authservice is an implementation of UserAuthService
@@ -40,7 +42,7 @@ func (*authservice) Find(loginUser entity.LoginUser) (entity.User, error) {
 	return foundUser, nil
 }
 
-// Add new user to the db
+// Add new user to the database
 func (s *authservice) Create(user entity.User) (entity.User, error) {
 	// Insert the new userId into the user body
 	user.UserId = s.GenerateUserId()
@@ -54,7 +56,7 @@ func (s *authservice) Create(user entity.User) (entity.User, error) {
 
 // generate userID
 func (s *authservice) GenerateUserId() string {
-	const charaset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const charaset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~!@#$%^&*"
 	rand.Seed(time.Now().UnixNano())
 
 	b := make([]byte, 30)
@@ -95,4 +97,24 @@ func (s *authservice) GenearateToken(user entity.User) (string, error) {
 		return "", err
 	}
 	return tokenString, nil
+}
+
+// create user infomation form the database
+func (s *authservice) CreateDetails(details entity.User_Details) (entity.User_Details, error) {
+	result := config.DB.Create(&details)
+	if result.Error != nil {
+		return entity.User_Details{}, result.Error
+	}
+	return entity.User_Details{}, nil
+}
+
+// find the user information from the database
+func (s *authservice) FindDetails(userId entity.UserId) (entity.User_Details, error) {
+	var foundDetails entity.User_Details
+	result := config.DB.Where("userid = ?", userId).First(&foundDetails)
+	if result.Error != nil {
+		return entity.User_Details{}, result.Error
+	}
+	return foundDetails, nil
+
 }
