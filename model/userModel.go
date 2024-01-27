@@ -21,3 +21,9 @@ type User_Details struct {
 	Discord  string
 	Google   string
 }
+
+type Avatar struct {
+	gorm.Model
+	UserId string `gorm:"unique;not null"`
+	Avatar string `gorm:"not null"`
+}

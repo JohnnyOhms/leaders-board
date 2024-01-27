@@ -19,12 +19,16 @@ type UserId struct {
 
 type User_Details struct {
 	UserId   string `json:"user_id"`
-	Avatar   string `json:"avatar"`
 	Username string `json:"username"`
 	Phone    int    `json:"phone"`
 	Twitter  string `json:"twitter"`
 	Discord  string `json:"discord"`
 	Google   string `json:"google"`
+}
+
+type Avatar struct {
+	UserId string `json:"user_id"`
+	Avatar string `json:"avatar"`
 }
 
 type DiscordToken struct {

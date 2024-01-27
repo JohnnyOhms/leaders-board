@@ -9,6 +9,7 @@ import (
 	"github.com/JohnnyOhms/projectx/entity"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // AuthService is an interface for user authentication services
@@ -21,6 +22,7 @@ type AuthService interface {
 	GenerateUserId() string
 	CreateDetails(details entity.User_Details) (entity.User_Details, error)
 	FindDetails(userId entity.UserId) (entity.User_Details, error)
+	SetAvatar(avatar entity.Avatar, filename string) (entity.Avatar, error)
 }
 
 // authservice is an implementation of UserAuthService
@@ -116,5 +118,28 @@ func (s *authservice) FindDetails(userId entity.UserId) (entity.User_Details, er
 		return entity.User_Details{}, result.Error
 	}
 	return foundDetails, nil
+}
 
+func (s *authservice) SetAvatar(avatar entity.Avatar, filename string) (entity.Avatar, error) {
+	// Check if the user ID already exists in the database
+	var existingAvatar entity.Avatar
+	result := config.DB.Where("user_id = ?", avatar.UserId).First(&existingAvatar)
+	if result.Error == nil {
+		// User ID already exists, update the record
+		existingAvatar.Avatar = filename
+		result := config.DB.Save(&existingAvatar)
+		if result.Error != nil {
+			return entity.Avatar{}, result.Error
+		}
+	} else if result.Error == gorm.ErrRecordNotFound {
+		// User ID doesn't exist, create a new record
+		result := config.DB.Create(&avatar)
+		if result.Error != nil {
+			return entity.Avatar{}, result.Error
+		}
+	} else {
+		// Database error
+		return entity.Avatar{}, result.Error
+	}
+	return existingAvatar, nil
 }
