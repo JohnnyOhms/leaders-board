@@ -16,7 +16,7 @@ var (
 )
 
 func init() {
-	// config.Loadenv()
+
 	config.ConnectToDB()
 	config.SyncDB()
 }
