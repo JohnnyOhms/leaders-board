@@ -16,7 +16,7 @@ var (
 )
 
 func init() {
-	config.Loadenv()
+	// config.Loadenv()
 	config.ConnectToDB()
 	config.SyncDB()
 }
@@ -29,13 +29,17 @@ func main() {
 	r.POST("/api/auth/setdetails", AuthController.SetUserDetails)
 	r.POST("/api/auth/getdetails", AuthController.ReteriveUserDetails)
 	r.GET("/api/auth/discord/redirect", AuthController.DiscordAuth)
-	r.POST("/api/upload", AuthController.UploadHandler)
+	r.POST("/api/upload", AuthController.UploadAvatar)
 
-	// Create the "uploads" directory if it doesn't exist
-	if err := os.MkdirAll("uploads", os.ModePerm); err != nil {
+	// Create the "avatar" directory if it doesn't exist
+	if err := os.MkdirAll("avatar", os.ModePerm); err != nil {
 		fmt.Println("Error creating 'uploads' directory:", err)
 		return
 	}
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "9000"
+	}
 
-	r.Run(":9000")
+	r.Run(":" + port)
 }
