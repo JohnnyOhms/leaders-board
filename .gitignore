@@ -2,3 +2,6 @@ Todo
 projectx.exe
 projectx.exe~
 .env
+/uploads
+/avatar
+/config/loadenv.go
