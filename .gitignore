@@ -4,4 +4,3 @@ projectx.exe~
 .env
 /uploads
 /avatar
-/config/loadenv.go
