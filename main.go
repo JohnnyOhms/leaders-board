@@ -16,7 +16,6 @@ var (
 )
 
 func init() {
-	config.Loadenv()
 	config.ConnectToDB()
 	config.SyncDB()
 }
@@ -40,7 +39,7 @@ func main() {
 	// Load environment variables
 	if err := config.Loadenv(); err != nil {
 		fmt.Println("Failed to load environment variables:", err)
-		return
+		// return
 	}
 
 	// Check if PORT environment variable is set

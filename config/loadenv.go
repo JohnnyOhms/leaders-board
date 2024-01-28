@@ -10,7 +10,6 @@ import (
 func Loadenv() error {
 	err := godotenv.Load()
 	if err != nil {
-		fmt.Println(err)
 		return fmt.Errorf("error loading .env file: %w", err)
 	}
 	return nil
