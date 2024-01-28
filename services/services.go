@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"time"
@@ -58,7 +59,7 @@ func (s *authservice) Create(user entity.User) (entity.User, error) {
 
 // generate userID
 func (s *authservice) GenerateUserId() string {
-	const charaset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~!@#$%^&*"
+	const charaset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@$"
 	rand.Seed(time.Now().UnixNano())
 
 	b := make([]byte, 30)
@@ -120,13 +121,38 @@ func (s *authservice) FindDetails(userId entity.UserId) (entity.User_Details, er
 	return foundDetails, nil
 }
 
-func (s *authservice) SetAvatar(avatar entity.Avatar, filename string) (entity.Avatar, error) {
+// func (s *authservice) SetAvatar(avatar entity.Avatar, filename string) (entity.Avatar, error) {
+// 	// Check if the user ID already exists in the database
+// 	var existingAvatar entity.Avatar
+// 	result := config.DB.Where("user_id = ?", avatar.UserId).First(&existingAvatar)
+// 	if result.Error == nil {
+// 		// User ID already exists, update the record
+// 		existingAvatar.Avatar = filename
+// 		result := config.DB.Save(&existingAvatar)
+// 		if result.Error != nil {
+// 			return entity.Avatar{}, result.Error
+// 		}
+// 	} else if result.Error == gorm.ErrRecordNotFound {
+// 		// User ID doesn't exist, create a new record
+// 		result := config.DB.Create(&avatar)
+// 		if result.Error != nil {
+// 			return entity.Avatar{}, result.Error
+// 		}
+// 	} else {
+// 		// Database error
+// 		return entity.Avatar{}, result.Error
+// 	}
+// 	return existingAvatar, nil
+// }
+
+func (s *authservice) SetAvatar(avatar entity.Avatar, userID string) (entity.Avatar, error) {
 	// Check if the user ID already exists in the database
+	fmt.Println("in the db service")
 	var existingAvatar entity.Avatar
-	result := config.DB.Where("user_id = ?", avatar.UserId).First(&existingAvatar)
+	result := config.DB.Where("user_id = ?", existingAvatar.UserId).First(&existingAvatar)
 	if result.Error == nil {
 		// User ID already exists, update the record
-		existingAvatar.Avatar = filename
+		existingAvatar.Avatar = avatar.Avatar
 		result := config.DB.Save(&existingAvatar)
 		if result.Error != nil {
 			return entity.Avatar{}, result.Error

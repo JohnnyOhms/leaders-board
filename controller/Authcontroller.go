@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	_ "io"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -24,7 +24,7 @@ type AuthController interface {
 	SetUserDetails(ctx *gin.Context)
 	ReteriveUserDetails(ctx *gin.Context)
 	DiscordAuth(ctx *gin.Context)
-	UploadHandler(ctx *gin.Context)
+	UploadAvatar(ctx *gin.Context)
 }
 
 // controller is the implementation of AuthController.
@@ -352,70 +352,106 @@ func (c *controller) DiscordAuth(ctx *gin.Context) {
 }
 
 // upload the avatar (profile pic) to the server
-func (c *controller) UploadHandler(ctx *gin.Context) {
-	// 	// Parse the form data, including the uploaded file
-	// 	err := ctx.Request.ParseMultipartForm(1 << 20) // 1 MB limit for the uploaded file
-	// 	if err != nil {
-	// 		ctx.JSON(400, gin.H{"error": "Unable to parse form"})
-	// 		return
-	// 	}
+// func (c *controller) UploadAvatar(ctx *gin.Context) {
+// 	// Parse the form data, including the uploaded file
+// 	err := ctx.Request.ParseMultipartForm(1 << 20) // 10 MB limit for the uploaded file
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Unable to parse form"})
+// 		return
+// 	}
 
-	// 	// Get the file from the request
-	// 	file, handler, err := ctx.Request.FormFile("avatar")
-	// 	if err != nil {
-	// 		ctx.JSON(400, gin.H{"error": "Error retrieving the file"})
-	// 		return
-	// 	}
-	// 	defer file.Close()
+// 	// Get the file from the request
+// 	file, handler, err := ctx.Request.FormFile("avatar")
+// 	if err != nil {
+// 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Error retrieving the file"})
+// 		return
+// 	}
+// 	defer file.Close()
 
-	// 	// Create a new file on the server to save the uploaded file
-	// 	filename := filepath.Join("uploads", handler.Filename)
-	// 	f, err := os.Create(filename)
-	// 	if err != nil {
-	// 		ctx.JSON(500, gin.H{"error": "Unable to create the file on the server"})
-	// 		return
-	// 	}
-	// 	defer f.Close()
+// 	// Get the userId from the form data
+// 	userId := ""
 
-	// 	// Copy the file content to the new file
-	// 	_, err = io.Copy(f, file)
-	// 	if err != nil {
-	// 		ctx.JSON(500, gin.H{"error": "Unable to copy the file content"})
-	// 		return
-	// 	}
+// 	// Create a new file on the server to save the uploaded file
+// 	filename := filepath.Join("avatar", handler.Filename+userId)
+// 	f, err := os.Create(filename)
+// 	if err != nil {
+// 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to create the file on the server"})
+// 		return
+// 	}
+// 	defer f.Close()
 
-	// 	// Respond with a success message
-	// 	ctx.JSON(201, gin.H{"message": fmt.Sprintf("File %s uploaded successfully", handler.Filename)}) // Parse the form data, including the uploaded file
-	err := ctx.Request.ParseMultipartForm(10 << 20) // 10 MB limit for the uploaded file
+// 	// Copy the file content to the new file
+// 	_, err = io.Copy(f, file)
+// 	if err != nil {
+// 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to copy the file content"})
+// 		return
+// 	}
+
+// 	// Respond with a success message
+// 	ctx.JSON(http.StatusCreated, gin.H{"message": fmt.Sprintf("File %s uploaded successfully", handler.Filename)})
+// }
+
+// type Avatar struct {
+// 	gorm.Model
+// 	UserID uint
+// 	Avatar string
+// }
+
+// UploadAvatar uploads the avatar (profile pic) to the server and stores the text in the database
+func (c *controller) UploadAvatar(ctx *gin.Context) {
+	// Parse the form data, including the uploaded file
+	err := ctx.Request.ParseMultipartForm(1 << 20) // 1 MB limit for the uploaded file
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Unable to parse form"})
 		return
 	}
 
-	// Get the user ID from the request
-	userID := ctx.PostForm("userId")
-
 	// Get the file from the request
-	file, _, err := ctx.Request.FormFile("avatar")
+	file, handler, err := ctx.Request.FormFile("avatar")
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Error retrieving the file"})
 		return
 	}
 	defer file.Close()
 
-	// Read the file content
-	avatarData, err := ioutil.ReadAll(file)
+	// Get the userId from the the authorization middleware
+	userID := "user id goes here"
+
+	// Create a new file on the server to save the uploaded file
+	filename := filepath.Join("avatars", fmt.Sprintf("%s_%s", userID, handler.Filename))
+	f, err := os.Create(filename)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to read the file content"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to create the file on the server"})
+		return
+	}
+	defer f.Close()
+
+	// Copy the file content to the new file
+	_, err = io.Copy(f, file)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to copy the file content"})
 		return
 	}
 
-	// Create a new file on the server to save the uploaded file
-	filename := filepath.Join("avatars", userID+".png")
-	err = ioutil.WriteFile(filename, avatarData, 0644)
+	// Store the image text in the database
+	fmt.Println("store to database")
+	text := extractTextFromImage(filename) // Implement this function to extract text from the image
+	avatar := entity.Avatar{UserId: userID, Avatar: text}
+
+	_, err = c.services.SetAvatar(avatar, userID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to save the file"})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Unable to store image text in the database"})
 		return
 	}
-	// }
+
+	// Respond with a success message
+	ctx.JSON(http.StatusCreated, gin.H{"message": fmt.Sprintf("File %s uploaded successfully", handler.Filename)})
+}
+
+// extractTextFromImage extracts text from the image file
+func extractTextFromImage(filename string) string {
+	// Implement your logic to extract text from the image
+	// This is just a placeholder
+	return strings.ToUpper(filename) // For demonstration, return the filename in uppercase
 }
