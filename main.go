@@ -16,7 +16,7 @@ var (
 )
 
 func init() {
-
+	config.Loadenv()
 	config.ConnectToDB()
 	config.SyncDB()
 }
@@ -33,12 +33,23 @@ func main() {
 
 	// Create the "avatar" directory if it doesn't exist
 	if err := os.MkdirAll("avatar", os.ModePerm); err != nil {
-		fmt.Println("Error creating 'uploads' directory:", err)
+		fmt.Println("Error creating 'avatar' directory:", err)
 		return
 	}
+
+	// Load environment variables
+	if err := config.Loadenv(); err != nil {
+		fmt.Println("Failed to load environment variables:", err)
+		return
+	}
+
+	// Check if PORT environment variable is set
 	port := os.Getenv("PORT")
 	if port == "" {
+		fmt.Println("PORT environment variable not set. Defaulting to port 9000.")
 		port = "9000"
+	} else {
+		fmt.Println("Using PORT:", port)
 	}
 
 	r.Run(":" + port)
